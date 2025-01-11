@@ -7,6 +7,5 @@ $probabilityDistribution->setAmountOfDesiredCopies(6);
 $probabilityDistribution->setAmountOfPulls(330);
 $probabilityDistribution->generateResults();
 
-echo '<pre>';
-print_r($probabilityDistribution->getResults());
+$probabilityDistribution->prettyPrintResults();
 ?>
