@@ -1,53 +1,82 @@
 <?php
 class ProbabilityDistribution {
-    const MIN_PRECISION = 0;
-    const MAX_PRECISION = 100;
-    const DEFAULT_PRECISION = 20;
-    private $precision = 0;
+    private const MIN_INTERNAL_MATH_PRECISION = 0;
+    private const MAX_INTERNAL_MATH_PRECISION = 100;
+    private const DEFAULT_INTERNAL_MATH_PRECISION = 20;
+    private $internalMathPrecision = 0;
 
-    const MIN_PROBABILITY = 0;
-    const MAX_PROBABILITY = 100;
-    const PROBABILITY_DENOMINATOR = 10000;
+    private const MIN_PROBABILITY = 0;
+    private const MAX_PROBABILITY = 100;
+    private const PROBABILITY_DENOMINATOR = 10000;
  
     private $probabilityOfsuccess = 0;
-    private $amountOfDesiredCopies = 1;
-    private $amountOfPulls = 1;
+    private $desiredCopiesAmounts = [1];
+    private $pullAmounts = [1];
     private $distributionResults = array();
 
-    const MIN_AMOUNT_OF_DESIRED_COPIES = 1;
-    const MIN_PULL_AMOUNT = 1;
+    private const MIN_AMOUNT_OF_DESIRED_COPIES = 1;
+    private const MIN_PULL_AMOUNT = 1;
 
-    const CUT_OFF_PRECISION = '0.0001';
-    const DISPLAY_DECIMAL_PLACES = 4;
-    const PERCENTAGE_CONVERSION_FACTOR = '100';
+    private const PERCENTAGE_CONVERSION_FACTOR = '100';
+    private const DEFAULT_CUT_OFF_DISPLAY_PRECISION = '0.0001';
+    private const DEFAULT_DECIMAL_PLACES_TO_DISPLAY = 4;
+    private const MIN_CUT_OFF_DISPLAY_PRECISION = 0;
+    private const MAX_CUT_OFF_DISPLAY_PRECISION = 10;
+
+    private $cutOffPrecision = self::DEFAULT_DECIMAL_PLACES_TO_DISPLAY;
+    private $displayDecimalPlaces = self::DEFAULT_CUT_OFF_DISPLAY_PRECISION;
 
     private $binomialCache = array();
     private $exactDistributionCache = array();
     private $atLeastDistributionCache = array();
+
+    // TODO: create functions to clear cache
 
     public function __construct() {
         if(!extension_loaded('bcmath')) {
             throw new Exception('BCMath extension is not loaded');
         }
 
-        $this->precision = self::DEFAULT_PRECISION;
-        bcscale($this->precision);
+        $this->internalMathPrecision = self::DEFAULT_INTERNAL_MATH_PRECISION;
+        bcscale($this->internalMathPrecision);
     }
 
-    public function setPrecision(int $precision): void {
-        if($precision < self::MIN_PRECISION || $precision > self::MAX_PRECISION) {
-            throw new InvalidArgumentException(
+    public function setInternalMathPrecision(int $internalMathPrecision): void {
+        if(
+            $internalMathPrecision < self::MIN_INTERNAL_MATH_PRECISION || 
+            $internalMathPrecision > self::MAX_PRECISION
+        ) {
+            throw new OutOfRangeException(
                 sprintf(
-                    'Precision must be an integer between %d and %d, received %d',
-                    self::MIN_PRECISION,
-                    self::MAX_PRECISION,
-                    $precision
+                    'Internal math precision must be an integer between %d and %d, received %d',
+                    self::MIN_INTERNAL_MATH_PRECISION,
+                    self::MAX_INTERNAL_MATH_PRECISION,
+                    $internalMathPrecision
                 )
             );
         }
 
-        $this->precision = $precision;
-        bcscale($this->precision);
+        $this->internalMathPrecision = $internalMathPrecision;
+        bcscale($this->internalMathPrecision);
+    }
+
+    public function setCutOffDisplayPrecision(int $cutOffDisplayPrecision): void {
+        if(
+            $cutOffDisplayPrecision < self::MIN_CUT_OFF_DISPLAY_PRECISION ||
+            $cutOffDisplayPrecision > self::MAX_CUT_OFF_DISPLAY_PRECISION
+        ) {
+            throw new OutOfRangeException(
+                sprintf(
+                    'Cut off display precision must be between %d and %d, received %d',
+                    self::MIN_CUT_OFF_DISPLAY_PRECISION,
+                    self::MAX_CUT_OFF_DISPLAY_PRECISION,
+                    $cutOffDisplayPrecision
+                )
+            );
+        }
+
+        $this->cutOffPrecision = $cutOffDisplayPrecision;
+        $this->displayDecimalPlaces = sprintf('0.%0' . max(($value - 1), 0) .'d1', 0);
     }
 
     public function setProbabilityOfsuccess(
@@ -71,37 +100,52 @@ class ProbabilityDistribution {
             );
         }
 
-        $probabilityOfSuccess = bcdiv(bcmul($genericResultChance, $specificresultChance), self::PROBABILITY_DENOMINATOR, $this->precision);
+        $probabilityOfSuccess = bcdiv(bcmul($genericResultChance, $specificresultChance), self::PROBABILITY_DENOMINATOR, $this->internalMathPrecision);
         $this->probabilityOfsuccess = $probabilityOfSuccess;
     }
 
-    public function setAmountOfDesiredCopies(int $amountOfDesiredCopies): void {
-        if($amountOfDesiredCopies < self::MIN_AMOUNT_OF_DESIRED_COPIES) {
+    public function setDesiredCopiesAmounts(array $desiredCopiesAmounts): void {
+        if (empty($desiredCopiesAmounts)) {
+            throw new InvalidArgumentException(
+                'Desired copies amounts must be a non-empty array of positive integers'
+            );
+        }
+    
+        foreach ($desiredCopiesAmounts as $desiredCopies) {
+            if (!is_int($desiredCopies) || $desiredCopies < self::MIN_AMOUNT_OF_DESIRED_COPIES) {
+                throw new InvalidArgumentException(
+                    sprintf(
+                        'Desired copies amounts must be an array of positive integers, received %s',
+                        gettype($desiredCopies)
+                    )
+                );
+            }
+        }
+    
+        $this->desiredCopiesAmounts = $desiredCopiesAmounts;
+    }
+
+    public function setPullAmounts(array $pullAmounts): void {
+        if(empty($pullAmounts)) {
             throw new OutOfRangeException(
                 sprintf(
-                    'Amount of desired copies must be at least %d, received %d',
-                    self::MIN_AMOUNT_OF_DESIRED_COPIES,
-                    $amountOfDesiredCopies
+                    'Pull amounts must be an array of positive integers, empty array received',
                 )
             );
         }
 
-        $this->amountOfDesiredCopies = $amountOfDesiredCopies;
-    }
-
-    public function setAmountOfPulls(array $amountOfPulls): void {
-        foreach($amountOfPulls as $pull) {
-            if(!is_int($pull) || $pull < self::MIN_PULL_AMOUNT) {
+        foreach($pullAmounts as $pullAmount) {
+            if(!is_int($pullAmount) || $pullAmount < self::MIN_PULL_AMOUNT) {
                 throw new OutOfRangeException(
                     sprintf(
                         'Amount of pulls must be an array of positive integers, received %s',
-                        gettype($pull)
+                        gettype($pullAmount)
                     )
                 );
             }
         }
 
-        $this->amountOfPulls = $amountOfPulls;
+        $this->pullAmounts = $pullAmounts;
     }
 
     public function getResults(): array {
@@ -121,15 +165,15 @@ class ProbabilityDistribution {
         $result = "1";
 
         for ($i = 1; $i <= $k; $i++) {
-            $result = bcdiv(bcmul($result, ($n - $i + 1)), $i, $this->precision);
+            $result = bcdiv(bcmul($result, ($n - $i + 1)), $i, $this->internalMathPrecision);
         }
 
         $this->binomialCache[$key] = $result;
         return $result;
     }
 
-    public function getExactBinomialDistribution(
-        int $amountDesiredCopies,
+    public function calculateExactBinomialDistribution(
+        int $desiredCopiesAmount,
         int $amountOfPulls,
         string $probabilityOfSuccess
     ): string {
@@ -139,28 +183,28 @@ class ProbabilityDistribution {
             );
         }
 
-        $key = "$amountDesiredCopies:$amountOfPulls:$probabilityOfSuccess";
+        $key = "$desiredCopiesAmount:$amountOfPulls:$probabilityOfSuccess";
 
         if (isset($exactDistributionCache[$key])) {
             return $exactDistributionCache[$key];
         }
 
         $logProb = 0;
-        $logProb += log(floatval($this->getBinomialCoefficient($amountOfPulls, $amountDesiredCopies)));
-        $logProb += $amountDesiredCopies * log(floatval($probabilityOfSuccess));
-        $logProb += ($amountOfPulls - $amountDesiredCopies) * log(1 - floatval($probabilityOfSuccess));
+        $logProb += log(floatval($this->getBinomialCoefficient($amountOfPulls, $desiredCopiesAmount)));
+        $logProb += $desiredCopiesAmount * log(floatval($probabilityOfSuccess));
+        $logProb += ($amountOfPulls - $desiredCopiesAmount) * log(1 - floatval($probabilityOfSuccess));
 
         if (is_infinite($logProb) || is_nan($logProb)) {
             $result = ($logProb == -INF) ? "0" : "INF";
         } else {
-            $result = number_format(exp($logProb), $this->precision, '.', '');
+            $result = number_format(exp($logProb), $this->internalMathPrecision, '.', '');
 
             // If the result is very small, use bcpow to represent it
             if (floatval($result) == 0) {
                 $exponent = strval($logProb / log(10));
 
                 if (is_numeric($exponent) && intval($exponent) == $exponent) {
-                    $result = bcpow("10", $exponent, $this->precision);
+                    $result = bcpow("10", $exponent, $this->internalMathPrecision);
                 } else {
                     $result = "0";
                 }
@@ -171,14 +215,15 @@ class ProbabilityDistribution {
         return $result;
     }
 
-    function getAtLeastBinomialDistribution(int $amountDesiredCopies, int $amountOfPulls, string $probabilityOfSuccess): string {
+    // uses calculateExactBinomialDistribution, therefore it is better to use this functin second (to use the cache)
+    function calculateAtLeastBinomialDistribution(int $desiredCopiesAmount, int $amountOfPulls, string $probabilityOfSuccess): string {
         if(!is_numeric($probabilityOfSuccess)) {
             throw new InvalidArgumentException(
                 sprintf('Probability of success must be a numeric value, received %s')
             );
         }
 
-        $key = "$amountDesiredCopies:$amountOfPulls:$probabilityOfSuccess";
+        $key = "$desiredCopiesAmount:$amountOfPulls:$probabilityOfSuccess";
 
         if (isset($atLeastDistributionCache[$key])) {
             return $atLeastDistributionCache[$key];
@@ -186,9 +231,9 @@ class ProbabilityDistribution {
 
         $probability = "0";
 
-        for ($i = $amountDesiredCopies; $i <= $amountOfPulls; $i++) {
-            $exactProb = $this->getExactBinomialDistribution($i, $amountOfPulls, $probabilityOfSuccess);
-            $probability = bcadd($probability, $exactProb, $this->precision);
+        for ($i = $desiredCopiesAmount; $i <= $amountOfPulls; $i++) {
+            $exactProb = $this->calculateExactBinomialDistribution($i, $amountOfPulls, $probabilityOfSuccess);
+            $probability = bcadd($probability, $exactProb, $this->internalMathPrecision);
         }
 
         $atLeastDistributionCache[$key] = $probability;
@@ -196,40 +241,46 @@ class ProbabilityDistribution {
     }
 
     function formatPercentage(string $probability): string {
-        $percentage = bcmul($probability, self::PERCENTAGE_CONVERSION_FACTOR, $this->precision);
+        $percentage = bcmul($probability, self::PERCENTAGE_CONVERSION_FACTOR, $this->setInternalMathPrecision);
 
-        if (bccomp($percentage, self::PERCENTAGE_CUTOFF, $this->precision) == -1) {
-            return "0.0000%"; // Cut-off point for relevancy
+        // Cut-off point for relevancy
+        if (bccomp($percentage, self::PERCENTAGE_INTERNAL_MATH_CUT_OFF, $this->internalMathPrecision) == -1) {
+            return str_replace('1', '0', $this->displayDecimalPlaces);
         }
 
         return number_format(floatval($percentage), self::DISPLAY_DECIMAL_PLACES) . '%';
     }
 
-    public function generateResults(): void {
-        $amountOfPulls = range(1, $this->amountOfPulls);
-        $amountOfDesiredCopies = range(1, $this->amountOfDesiredCopies);
+    private function getBinomialDistribution(callable $callback) {
+        $results = [];
 
-        foreach($amountOfPulls as $pulls) {
-            foreach($amountOfDesiredCopies as $desiredCopies) {
-                $exactResult = $this->getExactBinomialDistribution(
-                    $desiredCopies,
-                    $pulls,
+        foreach($this->pullAmounts as $pullAmount) {
+            foreach($this->desiredCopiesAmounts as $desiredCopiesAmount) {
+                $results[$pullAmount][$desiredCopiesAmount] = $callback(
+                    $desiredCopiesAmount, 
+                    $pullAmount, 
                     $this->probabilityOfsuccess
                 );
-
-                $atLeastResult = $this->getAtLeastBinomialDistribution(
-                    $desiredCopies,
-                    $pulls,
-                    $this->probabilityOfsuccess
-                );
-
-                $this->distributionResults[$pulls][$desiredCopies] = [
-                    'exact' => $this->formatPercentage($exactResult),
-                    'atLeast' => $this->formatPercentage($atLeastResult)
-                ];
             }
         }
+
+        return $results;
     }
+
+    public function getExactBinomialDistribution() {
+        return $this->getBinomialDistribution([$this, 'calculateExactBinomialDistribution']);
+    }
+
+    public function getAtLeastBinomialDistribution() {
+        return $this->getBinomialDistribution([$this, 'calculateAtLeastBinomialDistribution']);
+    }
+
+
+
+
+
+
+
 
     public function prettyPrintResults() {
         $html = '
@@ -271,14 +322,14 @@ class ProbabilityDistribution {
             <thead>
                 <tr>
                     <th></th>
-                    <th colspan="'.$this->amountOfDesiredCopies.'">Exact Copies</th>
-                    <th colspan="'.$this->amountOfDesiredCopies.'">At Least Copies</th>
+                    <th colspan="'.$this->desiredCopiesAmounts.'">Exact Copies</th>
+                    <th colspan="'.$this->desiredCopiesAmounts.'">At Least Copies</th>
                 </tr>
                 <tr>
                     <th>Number of Pulls</th>';
 
  
-        for ($i = 1; $i <= $this->amountOfDesiredCopies; $i++) {
+        for ($i = 1; $i <= $this->desiredCopiesAmounts; $i++) {
             $html .= '<th>' . $i . '</th>';
             $html .= '<th>' . $i . '</th>';
         }
@@ -293,11 +344,11 @@ class ProbabilityDistribution {
                 <tr>
                     <td class="pulls">' . $pulls . '</td>';
  
-            for ($i = 1; $i <= $this->amountOfDesiredCopies; $i++) {
+            for ($i = 1; $i <= $this->desiredCopiesAmounts; $i++) {
                 $html .= '<td class="exact">' . $results[$i]['exact'] . '</td>';
             }
 
-            for ($i = 1; $i <= $this->amountOfDesiredCopies; $i++) {
+            for ($i = 1; $i <= $this->desiredCopiesAmounts; $i++) {
                 $html .= '<td class="atLeast">' . $results[$i]['atLeast'] . '</td>';
             }
 
