@@ -240,15 +240,15 @@ class ProbabilityDistribution {
         return $probability;
     }
 
-    function formatPercentage(string $probability): string {
-        $percentage = bcmul($probability, self::PERCENTAGE_CONVERSION_FACTOR, $this->setInternalMathPrecision);
+    function formatPercentage(string &$probability): void {
+        $percentage = bcmul($probability, self::PERCENTAGE_CONVERSION_FACTOR, $this->internalMathPrecision);
 
         // Cut-off point for relevancy
-        if (bccomp($percentage, self::PERCENTAGE_INTERNAL_MATH_CUT_OFF, $this->internalMathPrecision) == -1) {
-            return str_replace('1', '0', $this->displayDecimalPlaces);
+        if (bccomp($percentage, self::DEFAULT_CUT_OFF_DISPLAY_PRECISION, $this->internalMathPrecision) == -1) {
+            $probability = str_replace('1', '0', $this->displayDecimalPlaces);
         }
 
-        return number_format(floatval($percentage), self::DISPLAY_DECIMAL_PLACES) . '%';
+        $probability = number_format(floatval($percentage), self::DEFAULT_DECIMAL_PLACES_TO_DISPLAY) . '%';
     }
 
     private function getBinomialDistribution(callable $callback) {
@@ -267,12 +267,24 @@ class ProbabilityDistribution {
         return $results;
     }
 
-    public function getExactBinomialDistribution() {
-        return $this->getBinomialDistribution([$this, 'calculateExactBinomialDistribution']);
+    public function getExactBinomialDistribution($isFormatOutput = true) {
+        $results = $this->getBinomialDistribution([$this, 'calculateExactBinomialDistribution']);
+
+        if($isFormatOutput) {
+            array_walk_recursive($results, [$this, 'formatPercentage']);
+        }
+
+        return $results;
     }
 
-    public function getAtLeastBinomialDistribution() {
-        return $this->getBinomialDistribution([$this, 'calculateAtLeastBinomialDistribution']);
+    public function getAtLeastBinomialDistribution($isFormatOutput = true) {
+        $results = $this->getBinomialDistribution([$this, 'calculateAtLeastBinomialDistribution']);
+
+        if($isFormatOutput) {
+            array_walk_recursive($results, [$this, 'formatPercentage']);
+        }
+
+        return $results;
     }
 
 
