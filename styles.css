@@ -1,0 +1,45 @@
+html {
+    font-family: "Arial";
+}
+
+.table-container {
+    display: inline-block;
+    margin: 10px;
+}
+
+.table-container table {
+    margin: 0px;
+}
+
+.distributionTable {
+    border-collapse: collapse;
+}
+
+.distributionTable th, .distributionTable td {
+    border: 1px solid black;
+    text-align: right;
+    padding: 4px 6px;
+}
+
+.distributionTable th {
+    background-color: #94E797;
+    text-align: center;
+}
+
+.distributionTable tr:nth-child(even) td {
+    background-color: #FFD7BE;
+}
+
+.distributionTable tr:nth-child(odd) td {
+    background-color: #F2F2F2;
+}
+
+.distributionTable tr:hover td {
+    filter: contrast(0.8);
+    border: 2px solid black;
+}
+
+.distributionTable tr td.exact:first-of-type,
+.distributionTable tr td.atLeast:first-of-type {
+    border-left: 2px solid black;
+}

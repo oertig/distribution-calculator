@@ -1,124 +1,101 @@
 <?php
+namespace DistributionCalculator;
+
 class TableRenderer {
-    public function renderTable(array $data, array $copyAmounts): string {
-        $html = $this->getHtmlTemplate();
+    public function renderTable(
+        array $data, 
+        array $copyAmounts, 
+        int $amountForMulti = 10,
+        string $amountLabel = 'Copies',
+        bool $isMultiesShown = false
+    ): string {
+        $copiesColumnCount = count($copyAmounts);
+        
+        $html = $this->getHtmlTemplate($copiesColumnCount, true);
 
-        $amountHeaders = count($copyAmounts);
-        $amountCopiesHeader = '';
+        $html = str_replace('%%AMOUNT_LABEL%%', $amountLabel, $html);
+        $html = str_replace('%%TABLE_ROWS%%', $this->getHtmlTableRows($data, $amountForMulti, $isMultiesShown), $html);
 
-        foreach($copyAmounts as $copyAmount) {
-            $amountCopiesHeader .= '<th>'.$copyAmount.'</th>';
+        for($i = 1; $i <= $copiesColumnCount; $i++) {
+            $html = str_replace('%%AMOUNT_LABEL_'.$i.'%%', $copyAmounts[$i-1], $html);
         }
-
-        $html = str_replace('%%AMOUNT_COPIES%%', $amountHeaders, $html);
-        $html = str_replace('%%CELLS_AMOUNT_COPIES%%', $amountCopiesHeader, $html);
-        // TODO: add the table rows
 
         return $html;
     }
 
-    private function getHtmlTemplate(): string {
+    public function renderHtmlSkeleton(string $content = ''): string {
+        $html = '
+            <html>
+                <head>
+                    <title>distribution Calculator</title>
+                    <link rel="stylesheet" type="text/css" href="styles.css">
+                </head>
+                <body>
+                    %%CONTENT%%
+                </body>
+            </html>
+        ';
+
+        return str_replace('%%CONTENT%%', $content, $html);
+    }
+
+    private function getHtmlTemplate(int $copiesColumnCount = 1, bool $isMultiesShown = false): string {
+        $multiesColumn = $isMultiesShown ? '<th>Multies</th>' : '';
+        $pullsColspan = $isMultiesShown ? '2' : '1';
+        $headerAmountCopies = '';
+
+        for($i = 1; $i <= $copiesColumnCount; $i++) {
+            $headerAmountCopies .= '<th>%%AMOUNT_LABEL_'.$i.'%%</th>';
+        }
+
         return '
-            <table>
-                <thead>
-                    <tr>
-                        <th> <!-- deliberately empty --> </th>
-                        <th colspan="%%AMOUNT_COPIES%%">Exact Copies</th>
-                    </tr>
-                    <tr>
-                        <th>Number of Pulls</th>
-                        // one cell per desired copy: %%CELLS_AMOUNT_COPIES%%
-                    </tr>
-                </thead>
-                <tbody>
-                    %%TABLE_ROWS%%
-                </tbody>
-            </table>
+            <div class="table-container">
+                <table class="distributionTable">
+                    <thead>
+                        <tr>
+                            <th colspan="'.$pullsColspan.'">Pulls</th>
+                            <th colspan="'.$copiesColumnCount.'">%%AMOUNT_LABEL%%</th>
+                        </tr>
+                        <tr>
+                            <th>Singles</th>
+                            '.$multiesColumn.'
+                            '.$headerAmountCopies.'
+                        </tr>
+                    </thead>
+                    <tbody>
+                        %%TABLE_ROWS%%
+                    </tbody>
+                </table>
+            </div>
         ';
     }
 
+    private function getHtmlTableRows(array $data, int $amountForMulti = 10, bool $isMultiesShown = false): string {
+        $html = '';
 
+        foreach($data as $amountSingles => $successChances) {
+            $html .= '<tr>';
+            $html .= '<td>'.$amountSingles.'</td>';
 
-    // old function from other class
-    public function prettyPrintResults() {
-        $html = '
-        <style>
-            #distributionTable {
-                border-collapse: collapse;
+            if($isMultiesShown) {
+                $cellMultiples = '<td></td>';
+
+                if($amountSingles % $amountForMulti === 0) { // if perfect multi without remainder
+                    $quotient = intdiv($amountSingles, $amountForMulti); // amount of multies
+                    $cellMultiples = '<td>'.$quotient.'</td>';
+                }
+
+                $html .= $cellMultiples;
             }
 
-            #distributionTable th, #distributionTable td {
-                border: 1px solid black;
-                text-align: center;
-                padding: 4px;
+            foreach($successChances as $successChance) {
+                $html .= '<td>'.$successChance.'</td>';
             }
 
-            #distributionTable th {
-                background-color: #94E797;
-            }
-
-            #distributionTable tr:nth-child(even) td {
-                background-color: #FFD7BE;
-            }
-
-            #distributionTable tr:nth-child(odd) td {
-                background-color: #F2F2F2;
-            }
-
-            #distributionTable tr:hover td {
-                filter: contrast(0.8);
-                2px solid black;
-            }
-
-            #distributionTable tr td.exact:first-of-type,
-            #distributionTable tr td.atLeast:first-of-type {
-                border-left: 2px solid black;
-            }
-        </style>
-
-        <table id="distributionTable">
-            <thead>
-                <tr>
-                    <th></th>
-                    <th colspan="'.$this->desiredCopiesAmounts.'">Exact Copies</th>
-                    <th colspan="'.$this->desiredCopiesAmounts.'">At Least Copies</th>
-                </tr>
-                <tr>
-                    <th>Number of Pulls</th>';
-
- 
-        for ($i = 1; $i <= $this->desiredCopiesAmounts; $i++) {
-            $html .= '<th>' . $i . '</th>';
-            $html .= '<th>' . $i . '</th>';
+            $html .= '</tr>';
         }
 
-        $html .= '
-                </tr>
-            </thead>
-            <tbody>';
-
-        foreach($this->distributionResults as $pulls => $results) {
-            $html .= '
-                <tr>
-                    <td class="pulls">' . $pulls . '</td>';
- 
-            for ($i = 1; $i <= $this->desiredCopiesAmounts; $i++) {
-                $html .= '<td class="exact">' . $results[$i]['exact'] . '</td>';
-            }
-
-            for ($i = 1; $i <= $this->desiredCopiesAmounts; $i++) {
-                $html .= '<td class="atLeast">' . $results[$i]['atLeast'] . '</td>';
-            }
-
-            $html .= '
-                </tr>';
-        }
-
-        $html .= '
-            </tbody>
-        </table>';
-
-        echo $html;
+        return $html;
     }
 }
 ?>
