@@ -2,8 +2,6 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-use DistributionCalculator;
-
 include_once('ProbabilityDistribution.class.php');
 $probabilityDistribution = new DistributionCalculator\ProbabilityDistribution();
 
