@@ -97,5 +97,77 @@ class TableRenderer {
 
         return $html;
     }
+
+    public function renderChart(array $data, string $chartTitle = 'Chart Title'): string {
+        $html = '<div class="chart-container">';
+        $html .= <<<EOT
+            <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+            <script type="text/javascript">
+            google.charts.load('current', {'packages':['corechart']});
+            google.charts.setOnLoadCallback(drawChart);
+
+            function drawChart() {
+                var data = google.visualization.arrayToDataTable([
+        EOT;
+
+        $dataHeaders = "['Singles', ";
+
+        reset($data);
+        $firstKey = key($data);
+
+        foreach($data[$firstKey] as $amountCopies => $successChance) {
+            $dataHeaders .= "'".$amountCopies." Copies', ";
+        }
+
+        $dataHeaders = substr($dataHeaders, 0, -2);
+        $dataHeaders .= "],";
+
+        $html .= $dataHeaders;
+        $dataPoints = '';
+
+        foreach($data as $amountSingles => $successChances) {
+            $dataString = "['".$amountSingles."'";
+
+            foreach($successChances as $successChance) {
+                // $dataString .= ", '".$successChance."'";
+                $dataString .= ", ".floatval(str_replace('%', '', $successChance));
+            }
+
+            $dataString .= "],";
+            $dataPoints .= $dataString;
+        }
+
+        $dataPoints= substr($dataPoints, 0, -1);
+        $html .= $dataPoints;
+
+        $amountDataPoints = count($data);
+        $chartWidth = $amountDataPoints * 50;
+        $chartHeight = ceil($chartWidth / 2);
+
+        $html .= <<<EOT
+                ]);
+
+                var options = {
+                title: '{$chartTitle}',
+                curveType: 'function',
+                legend: { position: 'bottom' },
+                chartArea: { width: '80%', height: '70%' },
+                fontSize: 10,
+                hAxis: {title: 'amount pulls' },
+                vAxis: {title: 'chance', format: '#%' }
+                };
+
+                var chart = new google.visualization.LineChart(document.getElementById('curve_chart_{$chartTitle}'));
+                chart.draw(data, options);
+            }
+            </script>
+
+            <div id="curve_chart_{$chartTitle}" style="width: {$chartWidth}px; height: {$chartHeight}px"></div>
+        EOT;
+
+        $html .= '</div>';
+
+        return $html;
+    }
 }
 ?>
