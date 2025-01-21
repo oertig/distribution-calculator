@@ -2,15 +2,32 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+use DistributionCalculator;
 
 include_once('ProbabilityDistribution.class.php');
-$probabilityDistribution = new ProbabilityDistribution();
+$probabilityDistribution = new DistributionCalculator\ProbabilityDistribution();
 
-$probabilityDistribution->setProbabilityOfsuccess(1, 80);
-$probabilityDistribution->setDesiredCopiesAmounts(range(1,6));
-$probabilityDistribution->setPullAmounts(range(11, 330, 11));
+include_once('TableRenderer.class.php'); // TODO: should this class be static?
+$tableRenderer = new DistributionCalculator\TableRenderer();
 
-echo '<pre>';
-print_r($probabilityDistribution->getExactBinomialDistribution());
-print_r($probabilityDistribution->getAtLeastBinomialDistribution());
+$baseProbability = 1;
+$rateUpWeight = 80;
+$amountForMulti = 11;
+$pullCounts = range(1,6);
+$pullAmounts = range(
+    $amountForMulti,
+    $amountForMulti * 30,
+    $amountForMulti);
+
+$probabilityDistribution->setProbabilityOfsuccess($baseProbability, $rateUpWeight);
+$probabilityDistribution->setDesiredCopiesAmounts($pullCounts);
+$probabilityDistribution->setPullAmounts($pullAmounts);
+
+$resultsExact = $probabilityDistribution->getExactBinomialDistribution();
+$resultsAtleast = $probabilityDistribution->getAtLeastBinomialDistribution();
+
+$tableExact = $tableRenderer->renderTable($resultsExact, $pullCounts, $amountForMulti, 'Exact Copies', true);
+$tableAtleast = $tableRenderer->renderTable($resultsAtleast, $pullCounts, $amountForMulti, 'AtLeast Copies', true);
+
+echo $tableRenderer->renderHtmlSkeleton($tableExact.$tableAtleast);
 ?>

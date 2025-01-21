@@ -1,4 +1,6 @@
 <?php
+namespace DistributionCalculator;
+
 class ProbabilityDistribution {
     private const MIN_INTERNAL_MATH_PRECISION = 0;
     private const MAX_INTERNAL_MATH_PRECISION = 100;
