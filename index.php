@@ -27,8 +27,5 @@ $resultsAtleast = $probabilityDistribution->getAtLeastBinomialDistribution();
 $tableExact = $tableRenderer->renderTable($resultsExact, $pullCounts, $amountForMulti, 'Exact Copies', true);
 $tableAtleast = $tableRenderer->renderTable($resultsAtleast, $pullCounts, $amountForMulti, 'AtLeast Copies', true);
 
-$chartExact = $tableRenderer->renderChart($resultsExact, 'Exact Copies');
-$chartAtleast = $tableRenderer->renderChart($resultsAtleast, 'AtLeast Copies');
-
-echo $tableRenderer->renderHtmlSkeleton($tableExact.$tableAtleast.$chartExact.$chartAtleast);
+echo $tableRenderer->renderHtmlSkeleton($tableExact.$tableAtleast);
 ?>
